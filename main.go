@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
-	"net/http"
 	"sort"
 	"strings"
 	"wxcloudrun-golang/db"
-	"wxcloudrun-golang/service"
 )
 
 // 与填写的服务器配置中的Token一致
@@ -22,10 +20,9 @@ func main() {
 	}
 	router := gin.Default()
 	router.GET("/wx")
-	http.HandleFunc("/", service.IndexHandler)
-	http.HandleFunc("/api/count", service.CounterHandler)
-	http.HandleFunc("/wechat/msg", service.WechatMessageHandle)
-	log.Fatal(http.ListenAndServe(":80", nil))
+	router.POST("wx")
+
+	log.Fatalln(router.Run(":80"))
 }
 
 func WXCheckSignature(ctx *gin.Context) {

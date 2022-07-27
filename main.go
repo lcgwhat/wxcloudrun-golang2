@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
+	"os"
 	"wxcloudrun-golang/db"
 )
 
@@ -13,6 +14,11 @@ func main() {
 	}
 	router := gin.Default()
 	myRouter(router)
-
-	log.Fatalln(router.Run(":80"))
+	port := os.Getenv("MY_PORT")
+	if port == "" {
+		port = ":8889"
+	} else {
+		port = ":" + port
+	}
+	log.Fatalln(router.Run(port))
 }

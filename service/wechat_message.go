@@ -36,6 +36,7 @@ func WxMsgReceive(ctx *gin.Context) {
 		return
 	}
 	log.Printf("[消息接收] - 收到消息, 消息类型为: %s, 消息内容为: %s\n", textMsg.MsgType, textMsg.Content)
+	log.Printf("[消息来自] - 收到来自%s的消息\n", textMsg.FromUserName)
 	// 对接收的消息进行被动回复
 	WXMsgReply(ctx, textMsg.ToUserName, textMsg.FromUserName)
 }

@@ -2,10 +2,13 @@ package service
 
 import (
 	"encoding/xml"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
+	"strconv"
+	"strings"
 	"time"
+	"wxcloudrun-golang/db/dao"
+	"wxcloudrun-golang/db/model"
 	"wxcloudrun-golang/util"
 )
 
@@ -35,10 +38,41 @@ func WxMsgReceive(ctx *gin.Context) {
 		log.Printf("[消息接收] - XML数据包解析失败: %v\n", err)
 		return
 	}
-	log.Printf("[消息接收] - 收到消息, 消息类型为: %s, 消息内容为: %s\n", textMsg.MsgType, textMsg.Content)
-	log.Printf("[消息来自] - 收到来自%s的消息\n", textMsg.FromUserName)
+	msg := "【签到失败】"
+	if textMsg.MsgType == "text" {
+		res := strings.Split(textMsg.Content, "-")
+		if len(res) >= 2 {
+			stringUId := res[0]
+			uid, err := strconv.Atoi(stringUId)
+			if err != nil {
+				msg = msg + ""
+			}
+			note := ""
+			if len(res) >= 3 {
+				note = res[2]
+			}
+
+			now := time.Now()
+			existCheck := dao.CheckImp.ExistCheck(uid, now)
+			if existCheck == true {
+				msg = msg + "今天已经签到过了。。。"
+			} else {
+				check := model.Check{
+					UserId:    uid,
+					Username:  textMsg.FromUserName,
+					CheckDate: now,
+					Note:      note,
+				}
+				err := dao.CheckImp.UpsertCheck(&check)
+				if err != nil {
+					msg = msg + err.Error()
+				}
+				msg = "签到成功"
+			}
+		}
+	}
 	// 对接收的消息进行被动回复
-	WXMsgReply(ctx, textMsg.ToUserName, textMsg.FromUserName)
+	WXMsgReply(ctx, textMsg.ToUserName, textMsg.FromUserName, msg)
 }
 
 type WxTextMsg struct {
@@ -62,19 +96,19 @@ type WXRepTextMsg struct {
 }
 
 // WXMsgReply 微信消息回复
-func WXMsgReply(c *gin.Context, fromUser, toUser string) {
+func WXMsgReply(c *gin.Context, fromUser, toUser string, msg string) {
 	repTextMsg := WXRepTextMsg{
 		ToUserName:   toUser,
 		FromUserName: fromUser,
 		CreateTime:   time.Now().Unix(),
 		MsgType:      "text",
-		Content:      fmt.Sprintf("[消息回复] - %s--%s", time.Now().Format("2006-01-02 15:04:05"), "签到成功"),
+		Content:      msg,
 	}
 
-	msg, err := xml.Marshal(&repTextMsg)
+	textMsg, err := xml.Marshal(&repTextMsg)
 	if err != nil {
 		log.Printf("[消息回复] - 将对象进行XML编码出错: %v\n", err)
 		return
 	}
-	_, _ = c.Writer.Write(msg)
+	_, _ = c.Writer.Write(textMsg)
 }

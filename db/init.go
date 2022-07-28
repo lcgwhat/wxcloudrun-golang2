@@ -2,8 +2,13 @@ package db
 
 import (
 	"fmt"
+	"gopkg.in/natefinch/lumberjack.v2"
+	"gorm.io/gorm/logger"
+	"io"
+	"log"
 	"os"
 	"time"
+	"wxcloudrun-golang/db/model"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -12,8 +17,23 @@ import (
 
 var dbInstance *gorm.DB
 
+type dbConf struct {
+	user     string
+	pwd      string
+	addr     string
+	dataBase string
+}
+
+var conf dbConf = dbConf{
+	user:     "root",
+	pwd:      "",
+	addr:     "127.0.0.1:3306",
+	dataBase: "test",
+}
+
 // Init 初始化数据库
 func Init() error {
+	port := os.Getenv("MY_PORT")
 
 	source := "%s:%s@tcp(%s)/%s?readTimeout=1500ms&writeTimeout=1500ms&charset=utf8&loc=Local&&parseTime=true"
 	user := os.Getenv("MYSQL_USERNAME")
@@ -23,10 +43,17 @@ func Init() error {
 	if dataBase == "" {
 		dataBase = "golang_demo"
 	}
+	if port == "" {
+		user = conf.user
+		pwd = conf.pwd
+		addr = conf.addr
+		dataBase = conf.dataBase
+	}
 	source = fmt.Sprintf(source, user, pwd, addr, dataBase)
 	fmt.Println("start init mysql with ", source)
 
 	db, err := gorm.Open(mysql.Open(source), &gorm.Config{
+		Logger: getGormLogger(), // 使用自定义 Logger
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true, // use singular table name, table for `User` would be `user` with this option enabled
 		}})
@@ -49,7 +76,7 @@ func Init() error {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	dbInstance = db
-
+	initMySqlTables(dbInstance)
 	fmt.Println("finish init mysql with ", source)
 	return nil
 }
@@ -57,4 +84,59 @@ func Init() error {
 // Get ...
 func Get() *gorm.DB {
 	return dbInstance
+}
+
+// 数据库表初始化
+func initMySqlTables(db *gorm.DB) {
+	err := db.AutoMigrate(
+		model.Check{},
+	)
+	if err != nil {
+		fmt.Println("migrate table failed", err.Error())
+	}
+}
+
+// 自定义 Logger（使用文件记录日志）
+func getGormLogger() logger.Interface {
+	var logMode logger.LogLevel
+
+	switch "info" {
+	case "silent":
+		logMode = logger.Silent
+	case "error":
+		logMode = logger.Error
+	case "warn":
+		logMode = logger.Warn
+	case "info":
+		logMode = logger.Info
+	default:
+		logMode = logger.Info
+	}
+
+	return logger.New(getGormLogWriter(), logger.Config{
+		SlowThreshold:             200 * time.Millisecond, // 慢 SQL 阈值
+		LogLevel:                  logMode,                // 日志级别
+		IgnoreRecordNotFoundError: false,                  // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  false,                  // 禁用彩色打印
+	})
+}
+func getGormLogWriter() logger.Writer {
+	var writer io.Writer
+	port := os.Getenv("MY_PORT")
+
+	// 是否启动日志文件
+	if port != "" {
+		// 自定义writer
+		writer = &lumberjack.Logger{
+			Filename:   "./sql.log",
+			MaxSize:    500,
+			MaxBackups: 3,
+			MaxAge:     20,
+			Compress:   true,
+		}
+	} else {
+		// 默认 Writer
+		writer = os.Stdout
+	}
+	return log.New(writer, "\r\n", log.LstdFlags)
 }

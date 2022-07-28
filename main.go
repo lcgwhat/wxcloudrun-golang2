@@ -5,12 +5,26 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	"os"
+	"time"
 	"wxcloudrun-golang/db"
 )
 
 func main() {
-	if err := db.Init(); err != nil {
-		log.Println(fmt.Sprintf("mysql init failed with %+v", err))
+	var try = 3
+	var start = func() error {
+		if err := db.Init(); err != nil {
+			log.Println(fmt.Sprintf("mysql init failed with %+v", err))
+			try--
+			return err
+		}
+		return nil
+	}
+	for try > 0 {
+		err := start()
+		if err != nil {
+			time.Sleep(time.Second)
+		}
+		break
 	}
 	router := gin.Default()
 	myRouter(router)

@@ -40,7 +40,7 @@ func (imp *CheckInterfaceImp) ExistCheck(userId int, checkDate time.Time) bool {
 	count := int64(0)
 	cli := db.Get()
 	date := checkDate.Format("2006-01-02")
-	err := cli.Table(check.TableName()).Where("id = ?", userId).Where("check_date = ?", date).Count(&count).Error
+	err := cli.Table(check.TableName()).Where("user_id = ?", userId).Where("check_date = ?", date).Count(&count).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false
@@ -53,7 +53,7 @@ func (imp *CheckInterfaceImp) GetCheck(userId int, checkDate time.Time) (*model.
 	var check = new(model.Check)
 
 	cli := db.Get()
-	err = cli.Table(check.TableName()).Where("id = ?", userId).Where("check_date = ?", checkDate).First(check).Error
+	err = cli.Table(check.TableName()).Where("user_id = ?", userId).Where("check_date = ?", checkDate).First(check).Error
 
 	return check, err
 }

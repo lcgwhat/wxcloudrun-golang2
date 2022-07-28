@@ -66,8 +66,9 @@ func WxMsgReceive(ctx *gin.Context) {
 				err := dao.CheckImp.UpsertCheck(&check)
 				if err != nil {
 					msg = msg + err.Error()
+				} else {
+					msg = "签到成功"
 				}
-				msg = "签到成功"
 			}
 		}
 	}

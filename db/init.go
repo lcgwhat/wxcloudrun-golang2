@@ -83,6 +83,25 @@ func Init() error {
 
 // Get ...
 func Get() *gorm.DB {
+	db, err := dbInstance.DB()
+	if err != nil {
+		panic(err)
+	}
+	err = db.Ping()
+	var try = 3
+
+	if err != nil {
+		for try > 0 {
+			err = Init()
+			if err != nil {
+				try--
+				time.Sleep(time.Millisecond * 200)
+			}
+			if try == 0 && err != nil {
+				panic(err)
+			}
+		}
+	}
 	return dbInstance
 }
 

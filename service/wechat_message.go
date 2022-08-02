@@ -59,8 +59,10 @@ func WxMsgReceive(ctx *gin.Context) {
 			err = doCheck(uid, textMsg.FromUserName, note)
 			if err != nil {
 				msg += err.Error()
+			} else {
+				msg = "【签到成功】"
 			}
-			msg = "【签到成功】"
+
 		}
 	}
 	// 对接收的消息进行被动回复

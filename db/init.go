@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 	"time"
 	"wxcloudrun-golang/db/model"
 
@@ -14,6 +15,11 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
+
+type dbInstance2 struct {
+	db *gorm.DB
+	sync.Mutex
+}
 
 var dbInstance *gorm.DB
 
@@ -83,12 +89,25 @@ func Init() error {
 
 // Get ...
 func Get() *gorm.DB {
+	var try = 3
+	if dbInstance == nil {
+		err := Init()
+		if err != nil {
+			try--
+			time.Sleep(time.Millisecond * 200)
+			if try == 0 {
+				panic(err)
+			}
+		} else {
+			return dbInstance
+		}
+
+	}
 	db, err := dbInstance.DB()
 	if err != nil {
 		panic(err)
 	}
 	err = db.Ping()
-	var try = 3
 
 	if err != nil {
 		for try > 0 {
@@ -96,9 +115,11 @@ func Get() *gorm.DB {
 			if err != nil {
 				try--
 				time.Sleep(time.Millisecond * 200)
-			}
-			if try == 0 && err != nil {
-				panic(err)
+				if try == 0 {
+					panic(err)
+				}
+			} else {
+				return dbInstance
 			}
 		}
 	}

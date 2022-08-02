@@ -2,11 +2,16 @@ package service
 
 import (
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"log"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
+	"wxcloudrun-golang/db"
 	"wxcloudrun-golang/db/dao"
 	"wxcloudrun-golang/db/model"
 	"wxcloudrun-golang/util"
@@ -51,29 +56,68 @@ func WxMsgReceive(ctx *gin.Context) {
 			if len(res) >= 3 {
 				note = res[2]
 			}
-
-			now := time.Now()
-			existCheck := dao.CheckImp.ExistCheck(uid, now)
-			if existCheck == true {
-				msg = msg + "今天已经签到过了。。。"
-			} else {
-				check := model.Check{
-					UserId:    uid,
-					Username:  textMsg.FromUserName,
-					CheckDate: now,
-					Note:      note,
-				}
-				err := dao.CheckImp.UpsertCheck(&check)
-				if err != nil {
-					msg = msg + err.Error()
-				} else {
-					msg = "签到成功"
-				}
+			err = doCheck(uid, textMsg.FromUserName, note)
+			if err != nil {
+				msg += err.Error()
 			}
+			msg = "【签到成功】"
 		}
 	}
 	// 对接收的消息进行被动回复
 	WXMsgReply(ctx, textMsg.ToUserName, textMsg.FromUserName, msg)
+}
+
+var ErrorChecked = errors.New("今天已经签到过了...")
+
+func doCheck(uid int, openId string, note string) error {
+	checkUser, err := dao.CheckUserImp.GetCheckUserById(int32(uid))
+	now := time.Now()
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		// 一天前
+		d, _ := time.ParseDuration("-24h")
+		d1 := now.Add(d)
+		user := model.CheckUser{
+			OpenId:        openId,
+			Username:      fmt.Sprintf("%s%v", "liu", rand.Float32()),
+			CreateTime:    time.Now(),
+			ContinuousDay: 0,
+			LastDay:       d1,
+		}
+		err := dao.CheckUserImp.UpsertCherUser(&user)
+		if err != nil {
+			return err
+		}
+		checkUser = &user
+	}
+
+	existCheck := dao.CheckImp.ExistCheck(uid, now)
+	if existCheck == true {
+		return ErrorChecked
+	} else {
+		check := model.Check{
+			UserId:    uid,
+			Username:  openId,
+			CheckDate: now,
+			Note:      note,
+		}
+		tx := db.Get().Begin()
+		err := dao.CheckImp.UpsertCheck(&check)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		ContinuousDay := 0
+		if !util.InSameDay(checkUser.LastDay.Unix(), now.Unix()) {
+			ContinuousDay = checkUser.ContinuousDay + 1
+		}
+		err = dao.CheckUserImp.SetCheckDate(checkUser.Id, ContinuousDay, now)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		return tx.Commit().Error
+	}
+
 }
 
 type WxTextMsg struct {

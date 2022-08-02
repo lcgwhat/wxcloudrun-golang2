@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"sort"
 	"strings"
+	"time"
 )
 
 // CheckSignature 微信公众号签名检查
@@ -28,4 +29,15 @@ func Sha1(str string) string {
 	h := sha1.New()
 	h.Write([]byte(str))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+/*
+	golang的time.Now()返回的是地方时(local time)
+*/
+
+func InSameDay(t1, t2 int64) bool {
+	y1, m1, d1 := time.Unix(t1, 0).Date()
+	y2, m2, d2 := time.Unix(t2, 0).Date()
+
+	return y1 == y2 && m1 == m2 && d1 == d2
 }

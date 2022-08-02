@@ -57,3 +57,36 @@ func (imp *CheckInterfaceImp) GetCheck(userId int, checkDate time.Time) (*model.
 
 	return check, err
 }
+
+type CheckUserInterface interface {
+	GetCheckUserByOpenId(openId string) (*model.CheckUser, error)
+	GetCheckUserById(id int32) (*model.CheckUser, error)
+	SetCheckDate(userId int, ContinuousDay int, CheckDate time.Time) error
+	UpsertCherUser(user *model.CheckUser) error
+}
+type CheckUserInterfaceImp struct{}
+
+var CheckUserImp = &CheckUserInterfaceImp{}
+
+func (c *CheckUserInterfaceImp) UpsertCherUser(u *model.CheckUser) error {
+	cli := db.Get()
+	return cli.Model(u).Save(u).Error
+}
+func (c *CheckUserInterfaceImp) GetCheckUserByOpenId(openId string) (*model.CheckUser, error) {
+	cli := db.Get()
+	var checkUser = new(model.CheckUser)
+	err := cli.Table(checkUser.TableName()).Where("open_id = ?", openId).First(checkUser).Error
+	return checkUser, err
+}
+
+func (c *CheckUserInterfaceImp) GetCheckUserById(id int32) (*model.CheckUser, error) {
+	cli := db.Get()
+	var checkUser = new(model.CheckUser)
+	err := cli.Table(checkUser.TableName()).Where("id = ?", id).First(checkUser).Error
+	return checkUser, err
+}
+
+func (c *CheckUserInterfaceImp) SetCheckDate(userId int, ContinuousDay int, CheckDate time.Time) error {
+	cli := db.Get()
+	return cli.Exec("Update check_user set continuous_day=? , last_day=? where id = ?", ContinuousDay, CheckDate, userId).Error
+}

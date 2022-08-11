@@ -19,6 +19,7 @@ import (
 
 // 与填写的服务器配置中的Token一致
 const Token = "clear_love"
+const failed = "失败"
 
 func WXCheckSignature(ctx *gin.Context) {
 	signature := ctx.Query("signature")
@@ -45,7 +46,7 @@ func WxMsgReceive(ctx *gin.Context) {
 	}
 	msg := "【签到失败】"
 	if textMsg.MsgType == "text" {
-		res := strings.Split(textMsg.Content, "-")
+		res := strings.Split(textMsg.Content, "|")
 		if len(res) >= 2 {
 			stringUId := res[0]
 			uid, err := strconv.Atoi(stringUId)
@@ -56,13 +57,23 @@ func WxMsgReceive(ctx *gin.Context) {
 			if len(res) >= 3 {
 				note = res[2]
 			}
-			err = doCheck(uid, textMsg.FromUserName, note)
+			err = doCheck(uid, textMsg.FromUserName, res[1], note)
 			if err != nil {
 				msg += err.Error()
 			} else {
 				msg = "【签到成功】"
 			}
 
+		}
+		if len(res) == 1 {
+			stringTime := res[0]
+			loc, _ := time.LoadLocation("Local")
+			the_time, err := time.ParseInLocation("2006-01", stringTime, loc)
+			if err != nil {
+				msg = err.Error()
+			}
+			count := dao.CheckImp.GetCheckFail(textMsg.FromUserName, the_time)
+			msg = fmt.Sprintf("%s共出错了%v", stringTime, count)
 		}
 	}
 	// 对接收的消息进行被动回复
@@ -71,7 +82,7 @@ func WxMsgReceive(ctx *gin.Context) {
 
 var ErrorChecked = errors.New("今天已经签到过了...")
 
-func doCheck(uid int, openId string, note string) error {
+func doCheck(uid int, openId string, result string, note string) error {
 	checkUser, err := dao.CheckUserImp.GetCheckUserById(int32(uid))
 	now := time.Now()
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
@@ -96,11 +107,16 @@ func doCheck(uid int, openId string, note string) error {
 	if existCheck == true {
 		return ErrorChecked
 	} else {
+		status := model.CheckStatus_1
+		if result == failed {
+			status = model.CheckStatus_3
+		}
 		check := model.Check{
 			UserId:    uid,
 			Username:  openId,
 			CheckDate: now,
 			Note:      note,
+			Status:    status,
 		}
 		tx := db.Get().Begin()
 		err := dao.CheckImp.UpsertCheck(&check)
@@ -111,6 +127,9 @@ func doCheck(uid int, openId string, note string) error {
 		ContinuousDay := 0
 		if !util.InSameDay(checkUser.LastDay.Unix(), now.Unix()) {
 			ContinuousDay = checkUser.ContinuousDay + 1
+		}
+		if result == failed {
+			ContinuousDay = 0
 		}
 		err = dao.CheckUserImp.SetCheckDate(checkUser.Id, ContinuousDay, now)
 		if err != nil {

@@ -14,3 +14,9 @@ type Check struct {
 func (m *Check) TableName() string {
 	return "check"
 }
+
+const (
+	CheckStatus_1 = 1
+	CheckStatus_2 = 2
+	CheckStatus_3 = 3
+)

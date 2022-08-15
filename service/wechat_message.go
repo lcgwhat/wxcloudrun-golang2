@@ -75,10 +75,11 @@ func WxMsgReceive(ctx *gin.Context) {
 			failCount := dao.CheckImp.GetCheckFail(textMsg.FromUserName, the_time)
 			count := dao.CheckImp.GetCheckMonth(textMsg.FromUserName, the_time)
 			res := 0.0
-			if count != 0 {
-				res = float64(failCount / count)
+			if count > 0 {
+				res = float64(failCount) / float64(count)
+				res = res * 100
 			}
-			msg = fmt.Sprintf("%s共出错了%v, 累计签到次数%v,%.2f", stringTime, failCount, count, res)
+			msg = fmt.Sprintf("%s共出错了%v, 累计签到次数%v,结果%.2f%", stringTime, failCount, count, res)
 		}
 	}
 	// 对接收的消息进行被动回复

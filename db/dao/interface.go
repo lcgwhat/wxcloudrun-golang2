@@ -26,12 +26,21 @@ type CheckInterface interface {
 	GetCheck(userId int, checkDate time.Time) (*model.Check, error)
 	ExistCheck(userId int, checkDate time.Time) bool
 	GetCheckFail(openId string, month time.Time) int64
+	GetCheckMonth(openId string, month time.Time) int64
 }
 
 type CheckInterfaceImp struct{}
 
 var CheckImp CheckInterface = &CheckInterfaceImp{}
 
+func (imp *CheckInterfaceImp) GetCheckMonth(openId string, month time.Time) int64 {
+	var check = new(model.Check)
+	count := int64(0)
+	cli := db.Get()
+	date := month.Format("2006-01")
+	cli.Table(check.TableName()).Where("username = ?", openId).Where("DATE_FORMAT(check_date,'%Y-%m')=?", date).Count(&count)
+	return count
+}
 func (imp *CheckInterfaceImp) GetCheckFail(openId string, month time.Time) int64 {
 	var check = new(model.Check)
 	count := int64(0)
